@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HARDWARE LABS // PC Core Architecture</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Orbitron:wght@400;600;800;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        techDark: '#0d1117',
+                        techCard: '#161b22',
+                        techHeader: '#090d12',
+                        techBorder: '#30363d',
+                        neonGreen: '#00ff66',
+                        neonCyan: '#00e5ff',
+                        neonRed: '#ff5555',
+                        neonAmber: '#ffa657',
+                        neonPurple: '#d2a8ff'
+                    },
+                    fontFamily: {
+                        orbitron: ['Orbitron', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            background-image:
+                radial-gradient(circle at 15% 15%, rgba(0, 255, 102, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(0, 229, 255, 0.03) 0%, transparent 40%),
+                linear-gradient(rgba(48, 54, 61, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(48, 54, 61, 0.15) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+        }
+
+        .neon-border-green {
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.15);
+            border-color: rgba(0, 255, 102, 0.4);
+        }
+        .neon-border-green:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.4), inset 0 0 10px rgba(0, 255, 102, 0.1);
+            border-color: #00ff66;
+        }
+
+        .glass-card {
+            background: rgba(22, 27, 34, 0.85);
+            backdrop-filter: blur(12px);
+        }
+
+        .scanlines { position: relative; overflow: hidden; }
+        .scanlines::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #00ff66; }
+            50% { opacity: 0.4; transform: scale(0.92); box-shadow: 0 0 2px #00ff66; }
+        }
+        .led-active { animation: pulse-glow 2s infinite ease-in-out; }
+
+        .clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #090d12; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff66; }
+    </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col justify-between selection:bg-neonGreen selection:text-black">
+
+    <!-- HEADER & NAVIGATION -->
+    <header class="sticky top-0 z-40 bg-techHeader/90 backdrop-blur-md border-b border-techBorder">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full bg-neonGreen led-active"></div>
+                <a href="#" class="font-orbitron text-xl sm:text-2xl font-black tracking-widest text-white flex items-center gap-2">
+                    HARDWARE<span class="text-neonGreen">_LABS</span>
+                    <span class="text-xs font-mono text-neonCyan bg-techCard px-2 py-0.5 rounded border border-techBorder hidden sm:inline-block">v2.6</span>
+                </a>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="flex-1 max-w-md relative hidden md:block">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-sm"></i>
+                <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="Buscar componentes (ej: CPU, RAM, monitor)..."
+                    class="w-full bg-techDark border border-techBorder focus:border-neonGreen focus:ring-1 focus:ring-neonGreen rounded-lg py-2 pl-10 pr-4 text-sm font-mono text-gray-200 placeholder-gray-500 transition outline-none"
+                    oninput="filterComponents()"
+                >
+            </div>
+
+            <div class="flex items-center gap-6 font-mono text-xs">
+                <div class="hidden lg:flex flex-col text-right">
+                    <span class="text-gray-500">SYSTEM_STATUS</span>
+                    <span class="text-neonGreen font-semibold">100% OPTIMAL</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Search Bar -->
+        <div class="px-4 pb-3 md:hidden">
+            <div class="relative w-full">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-xs"></i>
+                <input
+                    type="text"
+                    id="mobileSearchInput"
+                    placeholder="Buscar componentes..."
+                    class="w-full bg-techDark border border-techBorder focus:border-neonGreen rounded-lg py-1.5 pl-9 pr-3 text-xs font-mono text-gray-200 outline-none"
+                    oninput="syncMobileSearch(this.value)"
+                >
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+        <!-- HERO -->
+        <section class="relative rounded-2xl border border-techBorder glass-card overflow-hidden p-6 md:p-10 scanlines">
+            <div class="absolute -right-20 -top-20 w-80 h-80 bg-neonCyan/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -left-20 -bottom-20 w-80 h-80 bg-neonGreen/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-techDark border border-neonGreen/30 text-neonGreen font-mono text-xs">
+                        <i class="fa-solid fa-microchip"></i> GUÍA DE COMPONENTES
+                    </div>
+                    <h1 class="font-orbitron text-3xl sm:text-5xl font-extrabold text-white leading-tight">
+                        Matriz Técnica de <span class="text-transparent bg-clip-text bg-gradient-to-r from-neonGreen via-neonCyan to-neonPurple">Hardware PC</span>
+                    </h1>
+                    <p class="text-gray-400 font-sans text-sm sm:text-base leading-relaxed">
+                        Conoce qué es y para qué sirve cada pieza de una computadora: desde los componentes internos que forman el núcleo del equipo hasta los periféricos externos con los que interactúas todos los días.
+                    </p>
+
+                    <div class="grid grid-cols-3 gap-3 pt-2 font-mono">
+                        <div class="bg-techDark/80 p-3 rounded-lg border border-techBorder">
+                            <span class="block text-gray-500 text-[10px]">INTERNOS</span>
+                            <span class="text-neonGreen font-bold text-sm sm:text-base" id="statInternal">10</span>
+                        </div>
+                        <div class="bg-techDark/80 p-3 rounded-lg border border-techBorder">
+                            <span class="block text-gray-500 text-[10px]">PERIFÉRICOS</span>
+                            <span class="text-neonCyan font-bold text-sm sm:text-base" id="statExternal">8</span>
+                        </div>
+                        <div class="bg-techDark/80 p-3 rounded-lg border border-techBorder">
+                            <span class="block text-gray-500 text-[10px]">TOTAL</span>
+                            <span class="text-neonAmber font-bold text-sm sm:text-base" id="statTotal">18</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Index widget -->
+                <div class="lg:col-span-5 bg-techDark/90 rounded-xl border border-techBorder p-5 font-mono text-xs space-y-4">
+                    <div class="flex justify-between items-center border-b border-techBorder pb-2">
+                        <span class="text-gray-400"><i class="fa-solid fa-server text-neonCyan"></i> ÍNDICE DEL SISTEMA</span>
+                        <span class="text-neonGreen">ONLINE</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span>HARDWARE INTERNO</span>
+                                <span class="text-neonGreen">10 / 18</span>
+                            </div>
+                            <div class="w-full bg-techCard h-2 rounded-full overflow-hidden">
+                                <div class="bg-neonGreen h-full rounded-full" style="width: 55.5%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span>HARDWARE EXTERNO</span>
+                                <span class="text-neonCyan">8 / 18</span>
+                            </div>
+                            <div class="w-full bg-techCard h-2 rounded-full overflow-hidden">
+                                <div class="bg-neonCyan h-full rounded-full" style="width: 44.5%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-2 text-[10px] text-gray-500 flex justify-between border-t border-techBorder/60">
+                        <span>ENTRADA / SALIDA / ALMACENAMIENTO</span>
+                        <span>PERIFÉRICOS</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CATEGORY TABS -->
+        <section class="flex items-center justify-between gap-2 overflow-x-auto pb-2 border-b border-techBorder font-mono">
+            <div class="flex items-center gap-2 min-w-max" id="categoryTabs">
+                <button onclick="setCategory('all', this)" class="cat-btn active bg-neonGreen text-black font-semibold px-4 py-2 rounded-lg text-xs transition border border-neonGreen">
+                    <i class="fa-solid fa-border-all mr-1"></i> TODOS
+                </button>
+                <button onclick="setCategory('interno', this)" class="cat-btn bg-techCard hover:bg-techBorder text-gray-300 px-4 py-2 rounded-lg text-xs transition border border-techBorder">
+                    <i class="fa-solid fa-microchip mr-1 text-neonGreen"></i> HARDWARE INTERNO
+                </button>
+                <button onclick="setCategory('externo', this)" class="cat-btn bg-techCard hover:bg-techBorder text-gray-300 px-4 py-2 rounded-lg text-xs transition border border-techBorder">
+                    <i class="fa-solid fa-desktop mr-1 text-neonCyan"></i> HARDWARE EXTERNO (PERIFÉRICOS)
+                </button>
+            </div>
+        </section>
+
+        <!-- COMPONENTS GRID -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="componentsGrid"></section>
+
+        <!-- NO RESULTS -->
+        <div id="noResults" class="hidden text-center py-16 space-y-4">
+            <i class="fa-solid fa-triangle-exclamation text-4xl text-neonAmber"></i>
+            <p class="font-mono text-gray-400">No se encontraron componentes con los parámetros especificados.</p>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-techHeader border-t border-techBorder mt-16 py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 font-mono text-xs text-gray-500">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-terminal text-neonGreen"></i>
+                <span>HARDWARE_LABS ARCHITECTURE DATABASE &copy; 2026</span>
+            </div>
+            <div class="flex gap-6">
+                <span class="hover:text-neonGreen cursor-pointer">TERMS // ARCHITECTURE</span>
+                <span class="hover:text-neonCyan cursor-pointer">API SPECS</span>
+                <span class="hover:text-neonAmber cursor-pointer">SYSTEM DIAGNOSTIC</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- MODAL 1: DETAILS -->
+    <div id="detailsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-techCard border border-neonGreen rounded-xl max-w-2xl w-full p-6 space-y-6 relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('detailsModal')" class="absolute top-4 right-4 text-gray-400 hover:text-white font-mono text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="flex items-start gap-4 border-b border-techBorder pb-4 pr-8">
+                <div id="modalIcon" class="w-12 h-12 shrink-0 rounded-lg bg-techDark border border-techBorder flex items-center justify-center text-2xl text-neonGreen">
+                    <i class="fa-solid fa-microchip"></i>
+                </div>
+                <div>
+                    <span id="modalCategory" class="text-xs font-mono text-neonCyan font-semibold">CATEGORÍA</span>
+                    <h2 id="modalTitle" class="text-xl font-orbitron font-bold text-white">Nombre del Componente</h2>
+                    <p id="modalSubtitle" class="text-xs font-mono text-gray-400">Tipo</p>
+                </div>
+            </div>
+
+            <div id="modalImage"></div>
+
+            <div class="space-y-4">
+                <div class="bg-techDark p-4 rounded-lg border border-techBorder space-y-2">
+                    <h4 class="font-orbitron text-xs text-neonCyan flex items-center gap-2">
+                        <i class="fa-solid fa-circle-question"></i> ¿QUÉ ES?
+                    </h4>
+                    <p id="modalQue" class="text-sm text-gray-300 leading-relaxed font-sans"></p>
+                </div>
+                <div class="bg-techDark p-4 rounded-lg border border-techBorder space-y-2">
+                    <h4 class="font-orbitron text-xs text-neonGreen flex items-center gap-2">
+                        <i class="fa-solid fa-gears"></i> FUNCIÓN
+                    </h4>
+                    <p id="modalFuncion" class="text-sm text-gray-300 leading-relaxed font-sans"></p>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2 font-mono text-xs">
+                <button onclick="closeModal('detailsModal')" class="bg-techDark hover:bg-techBorder text-gray-300 px-5 py-2 rounded-lg border border-techBorder">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        const CATEGORY_LABELS = {
+            interno: 'HARDWARE INTERNO',
+            externo: 'HARDWARE EXTERNO (PERIFÉRICO)'
+        };
+
+        const componentsData = [
+            /* ===== HARDWARE INTERNO ===== */
+            {
+                id: 'int-1', category: 'interno', name: 'Placa madre (Motherboard)', subtitle: 'Componente interno #1',
+                icon: 'fa-solid fa-chess-board', colorClass: 'text-neonPurple', badge: 'BASE DEL SISTEMA',
+                que: 'Es la tarjeta de circuito impreso principal que conecta y comunica a todos los componentes de la computadora entre sí.',
+                funcion: 'Aloja el procesador, la memoria RAM, las tarjetas de expansión y los puertos de conexión, distribuyendo datos y energía a través de sus pistas y chipsets.'
+            },
+            {
+                id: 'int-2', category: 'interno', name: 'Procesador (CPU)', subtitle: 'Componente interno #2',
+                icon: 'fa-solid fa-microchip', colorClass: 'text-neonGreen', badge: 'CEREBRO',
+                que: 'Conocido como el «cerebro» de la computadora, es un circuito integrado complejo encargado de ejecutar las instrucciones de los programas y procesar los datos.',
+                funcion: 'Realiza miles de millones de cálculos por segundo, coordinando las tareas del sistema operativo, las aplicaciones y los videojuegos.'
+            },
+            {
+                id: 'int-3', category: 'interno', name: 'Memoria RAM', subtitle: 'Componente interno #3',
+                icon: 'fa-solid fa-memory', colorClass: 'text-neonAmber', badge: 'MEMORIA VOLÁTIL',
+                que: 'Es la memoria de acceso aleatorio y de trabajo temporal del equipo.',
+                funcion: 'Almacena de forma volátil los datos de los programas y juegos que estás usando en el momento exacto para que el procesador pueda acceder a ellos de manera ultrarrápida.'
+            },
+            {
+                id: 'int-4', category: 'interno', name: 'Disco duro (HDD) / Unidad de estado sólido (SSD)', subtitle: 'Componente interno #4',
+                icon: 'fa-solid fa-hard-drive', colorClass: 'text-neonRed', badge: 'ALMACENAMIENTO',
+                que: 'Son los dispositivos de almacenamiento masivo y permanente. El <strong>HDD</strong> utiliza discos magnéticos mecánicos, mientras que el <strong>SSD</strong> usa memoria flash electrónica sin partes móviles.',
+                funcion: 'Guardan de forma fija el sistema operativo, los programas, los documentos y los archivos multimedia del usuario, siendo los SSD mucho más veloces.'
+            },
+            {
+                id: 'int-5', category: 'interno', name: 'Tarjeta gráfica (GPU)', subtitle: 'Componente interno #5',
+                icon: 'fa-solid fa-display', colorClass: 'text-neonCyan', badge: 'GRÁFICOS',
+                que: 'Es un procesador especializado dedicado exclusivamente al procesamiento y renderizado de gráficos, imágenes y video.',
+                funcion: 'Libera al procesador principal de las pesadas cargas visuales, siendo indispensable para videojuegos, modelado 3D, animación y diseño gráfico profesional.'
+            },
+            {
+                id: 'int-6', category: 'interno', name: 'Fuente de poder (PSU)', subtitle: 'Componente interno #6',
+                icon: 'fa-solid fa-bolt', colorClass: 'text-neonAmber', badge: 'ENERGÍA',
+                que: 'Es el componente eléctrico que transforma la corriente alterna del tomacorriente en corriente continua de bajo voltaje.',
+                funcion: 'Distribuye de manera estable, limpia y segura la energía eléctrica necesaria para que cada pieza del hardware funcione sin riesgos de sobrecarga.'
+            },
+            {
+                id: 'int-7', category: 'interno', name: 'Sistema de enfriamiento (Ventiladores / Disipadores)', subtitle: 'Componente interno #7',
+                icon: 'fa-solid fa-fan', colorClass: 'text-neonGreen', badge: 'REFRIGERACIÓN',
+                que: 'Conjunto de elementos pasivos (radiadores de aluminio/cobre) y activos (ventiladores o refrigeración líquida).',
+                funcion: 'Disipan el calor generado por componentes de alto rendimiento como el procesador y la tarjeta gráfica para evitar sobrecalentamientos y daños en el sistema.'
+            },
+            {
+                id: 'int-8', category: 'interno', name: 'Tarjeta de sonido', subtitle: 'Componente interno #8',
+                icon: 'fa-solid fa-music', colorClass: 'text-neonPurple', badge: 'AUDIO',
+                que: 'Un componente (integrado en la placa madre o dedicado en formato PCIe) encargado de procesar las señales de audio.',
+                funcion: 'Convierte los datos digitales en señales analógicas para reproducir sonido nítido a través de bocinas o audífonos, y viceversa para los micrófonos.'
+            },
+            {
+                id: 'int-9', category: 'interno', name: 'Tarjeta de red', subtitle: 'Componente interno #9',
+                icon: 'fa-solid fa-network-wired', colorClass: 'text-neonCyan', badge: 'CONECTIVIDAD',
+                que: 'Dispositivo que permite conectar la computadora a redes de datos, ya sea mediante cables (Ethernet) o de forma inalámbrica (Wi-Fi y Bluetooth).',
+                funcion: 'Gestiona el intercambio de paquetes de datos con internet y con otros equipos dentro de una red local.'
+            },
+            {
+                id: 'int-10', category: 'interno', name: 'Gabinete (Chasis)', subtitle: 'Componente interno #10',
+                icon: 'fa-solid fa-server', colorClass: 'text-neonRed', badge: 'ESTRUCTURA',
+                que: 'La estructura metálica o de cristal templado que alberga, protege y organiza todo el hardware interno.',
+                funcion: 'Mantiene los componentes seguros contra el polvo y golpes, además de optimizar el flujo de aire para mantener una temperatura adecuada.'
+            },
+
+            /* ===== HARDWARE EXTERNO (PERIFÉRICOS) ===== */
+            {
+                id: 'ext-1', category: 'externo', name: 'Monitor', subtitle: 'Periférico #1 · Salida',
+                icon: 'fa-solid fa-desktop', colorClass: 'text-neonCyan', badge: 'SALIDA VISUAL',
+                que: 'El principal periférico de salida visual del sistema.',
+                funcion: 'Muestra en pantalla la interfaz gráfica del sistema operativo, las aplicaciones y los videojuegos mediante una matriz de píxeles iluminados.'
+            },
+            {
+                id: 'ext-2', category: 'externo', name: 'Teclado', subtitle: 'Periférico #2 · Entrada',
+                icon: 'fa-solid fa-keyboard', colorClass: 'text-neonGreen', badge: 'ENTRADA',
+                que: 'Un periférico de entrada compuesto por una matriz de botones o teclas.',
+                funcion: 'Permite al usuario introducir comandos de texto, atajos y órdenes operativas hacia la computadora.'
+            },
+            {
+                id: 'ext-3', category: 'externo', name: 'Mouse (Ratón)', subtitle: 'Periférico #3 · Entrada',
+                icon: 'fa-solid fa-computer-mouse', colorClass: 'text-neonGreen', badge: 'ENTRADA',
+                que: 'Un dispositivo apuntador ergonómico diseñado para facilitar la interacción con la interfaz gráfica.',
+                funcion: 'Permite desplazar el cursor en la pantalla, seleccionar elementos, hacer clic y navegar con precisión.'
+            },
+            {
+                id: 'ext-4', category: 'externo', name: 'Bocinas (Altavoces)', subtitle: 'Periférico #4 · Salida',
+                icon: 'fa-solid fa-volume-high', colorClass: 'text-neonAmber', badge: 'SALIDA ACÚSTICA',
+                que: 'Periféricos de salida acústica.',
+                funcion: 'Transforman las señales eléctricas de audio provenientes de la computadora en ondas sonoras audibles para el usuario.'
+            },
+            {
+                id: 'ext-5', category: 'externo', name: 'Micrófono', subtitle: 'Periférico #5 · Entrada',
+                icon: 'fa-solid fa-microphone', colorClass: 'text-neonPurple', badge: 'ENTRADA DE AUDIO',
+                que: 'Un dispositivo de entrada de audio.',
+                funcion: 'Captura ondas sonoras de la voz o el entorno y las convierte en señales eléctricas digitales que la computadora puede procesar, transmitir o grabar.'
+            },
+            {
+                id: 'ext-6', category: 'externo', name: 'Cámara web (Webcam)', subtitle: 'Periférico #6 · Entrada',
+                icon: 'fa-solid fa-video', colorClass: 'text-neonRed', badge: 'ENTRADA DE VIDEO',
+                que: 'Una pequeña cámara digital conectada al equipo.',
+                funcion: 'Captura video y fotografías en tiempo real, siendo fundamental para videoconferencias, streaming y transmisiones en vivo.'
+            },
+            {
+                id: 'ext-7', category: 'externo', name: 'Memoria USB (Pendrive)', subtitle: 'Periférico #7 · Almacenamiento',
+                icon: 'fa-brands fa-usb', colorClass: 'text-neonAmber', badge: 'PORTÁTIL',
+                que: 'Un pequeño dispositivo de almacenamiento portátil que utiliza memoria flash y conexión USB.',
+                funcion: 'Permite transportar, respaldar y transferir archivos de forma rápida entre diferentes computadoras.'
+            },
+            {
+                id: 'ext-8', category: 'externo', name: 'Disco duro externo', subtitle: 'Periférico #8 · Almacenamiento',
+                icon: 'fa-solid fa-hard-drive', colorClass: 'text-neonRed', badge: 'RESPALDO',
+                que: 'Una unidad de almacenamiento de gran capacidad montada en una carcasa portátil con interfaz USB.',
+                funcion: 'Sirve para realizar copias de seguridad de gran volumen y almacenar archivos pesados que no caben o no se desean mantener en el equipo principal.'
+            }
+        ];
+
+        /* ===== IMÁGENES =====
+           Las imágenes deben estar en la MISMA carpeta que este index.html.
+           Si las pasas a una subcarpeta (ej: 'img/'), cambia IMAGE_FOLDER.
+           El código prueba estas extensiones en orden hasta encontrar la correcta. */
+        const IMAGE_FOLDER = 'imagenes/';
+        const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'avif', 'gif'];
+
+        // id del componente -> nombre del archivo SIN extensión
+        const IMAGE_NAMES = {
+            'int-1': 'placa madre',
+            'int-2': 'procesador',
+            'int-3': 'memoria ram',
+            'int-4': 'disco duro',
+            'int-5': 'tarjeta grafica',
+            'int-6': 'fuente de poder',
+            'int-7': 'sistema de enfriamiento',
+            'int-8': 'tarjeta de sonido',
+            'int-9': 'tarjeta de red',
+            'int-10': 'Gabinete',
+            'ext-1': 'Monitor',
+            'ext-2': 'Teclado',
+            'ext-3': 'Mouse',
+            'ext-4': 'Bocinas',
+            'ext-5': 'Micrófono',
+            'ext-6': 'Cámara web',
+            'ext-7': 'memoria usb pendrive',
+            'ext-8': 'Disco duro externo'
+        };
+        componentsData.forEach(c => { c.img = IMAGE_NAMES[c.id] || null; });
+
+        // Construye el bloque de imagen (con respaldo al ícono si no carga)
+        function imageBlock(item, heightClass) {
+            const ph = `<div class="ph ${item.img ? 'hidden' : ''} absolute inset-0 flex items-center justify-center text-5xl ${item.colorClass}"><i class="${item.icon}"></i></div>`;
+            const img = item.img
+                ? `<img src="${encodeURI(IMAGE_FOLDER + item.img)}.${IMAGE_EXTS[0]}" data-base="${IMAGE_FOLDER + item.img}" data-i="0" alt="${item.name}" loading="lazy" onerror="imgFallback(this)" class="relative w-full h-full object-contain p-2">`
+                : '';
+            return `<div class="relative ${heightClass} w-full rounded-lg overflow-hidden ${item.img ? 'bg-white' : 'bg-techDark border border-techBorder'}">${img}${ph}</div>`;
+        }
+
+        // Si falla una extensión, prueba la siguiente; si fallan todas, muestra el ícono
+        function imgFallback(el) {
+            const next = parseInt(el.dataset.i) + 1;
+            if (next < IMAGE_EXTS.length) {
+                el.dataset.i = next;
+                el.src = encodeURI(el.dataset.base) + '.' + IMAGE_EXTS[next];
+            } else {
+                el.onerror = null;
+                el.classList.add('hidden');
+                el.parentElement.classList.replace('bg-white', 'bg-techDark');
+                el.parentElement.querySelector('.ph').classList.remove('hidden');
+            }
+        }
+
+        let activeCategory = 'all';
+
+        function stripHtml(s) {
+            return s.replace(/<[^>]*>/g, '');
+        }
+
+        function renderComponents() {
+            const grid = document.getElementById('componentsGrid');
+            const noResults = document.getElementById('noResults');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            grid.innerHTML = '';
+
+            const filtered = componentsData.filter(item => {
+                const matchesCategory = activeCategory === 'all' || item.category === activeCategory;
+                const haystack = [item.name, item.subtitle, item.badge, stripHtml(item.que), item.funcion]
+                    .join(' ').toLowerCase();
+                return matchesCategory && haystack.includes(searchVal);
+            });
+
+            if (filtered.length === 0) {
+                noResults.classList.remove('hidden');
+                return;
+            }
+            noResults.classList.add('hidden');
+
+            filtered.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "glass-card border border-techBorder rounded-xl p-5 flex flex-col justify-between transition-all duration-300 neon-border-green group";
+
+                card.innerHTML = `
+                    <div class="space-y-4">
+                        ${imageBlock(item, 'h-44')}
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="w-10 h-10 shrink-0 rounded-lg bg-techDark border border-techBorder flex items-center justify-center text-lg ${item.colorClass}">
+                                <i class="${item.icon}"></i>
+                            </div>
+                            <span class="bg-techDark text-neonGreen font-mono text-[10px] px-2 py-0.5 rounded border border-neonGreen/30 font-semibold tracking-wider text-right">
+                                ${item.badge}
+                            </span>
+                        </div>
+
+                        <div>
+                            <h3 class="font-orbitron font-bold text-white group-hover:text-neonGreen transition text-base">${item.name}</h3>
+                            <p class="font-mono text-xs text-gray-400">${item.subtitle}</p>
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <div>
+                                <span class="block font-mono text-[10px] text-neonCyan font-semibold mb-0.5">¿QUÉ ES?</span>
+                                <p class="text-xs text-gray-300 leading-relaxed clamp-3">${item.que}</p>
+                            </div>
+                            <div>
+                                <span class="block font-mono text-[10px] text-neonGreen font-semibold mb-0.5">FUNCIÓN</span>
+                                <p class="text-xs text-gray-300 leading-relaxed clamp-3">${item.funcion}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-5">
+                        <button onclick="openDetailsModal('${item.id}')" class="w-full bg-techDark hover:bg-neonGreen/10 border border-techBorder hover:border-neonGreen text-neonGreen font-mono text-xs py-2 rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-microchip"></i> Ver Ficha Completa
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function setCategory(cat, btn) {
+            activeCategory = cat;
+            document.querySelectorAll('.cat-btn').forEach(b => {
+                b.classList.remove('bg-neonGreen', 'text-black', 'font-semibold', 'active');
+                b.classList.add('bg-techCard', 'text-gray-300');
+            });
+            btn.classList.remove('bg-techCard', 'text-gray-300');
+            btn.classList.add('bg-neonGreen', 'text-black', 'font-semibold', 'active');
+            renderComponents();
+        }
+
+        function filterComponents() {
+            renderComponents();
+        }
+
+        function syncMobileSearch(val) {
+            document.getElementById('searchInput').value = val;
+            renderComponents();
+        }
+
+        function openDetailsModal(id) {
+            const comp = componentsData.find(c => c.id === id);
+            if (!comp) return;
+
+            document.getElementById('modalTitle').innerText = comp.name;
+            document.getElementById('modalSubtitle').innerText = comp.subtitle;
+            document.getElementById('modalCategory').innerText = CATEGORY_LABELS[comp.category];
+            document.getElementById('modalImage').innerHTML = imageBlock(comp, 'h-56');
+            document.getElementById('modalQue').innerHTML = comp.que;
+            document.getElementById('modalFuncion').innerText = comp.funcion;
+
+            const modalIcon = document.getElementById('modalIcon');
+            modalIcon.innerHTML = `<i class="${comp.icon}"></i>`;
+            modalIcon.className = `w-12 h-12 shrink-0 rounded-lg bg-techDark border border-techBorder flex items-center justify-center text-2xl ${comp.colorClass}`;
+
+            document.getElementById('detailsModal').classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // Cerrar modales con Escape
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeModal('detailsModal');
+            }
+        });
+
+        window.onload = function () {
+            const internos = componentsData.filter(c => c.category === 'interno').length;
+            const externos = componentsData.filter(c => c.category === 'externo').length;
+            document.getElementById('statInternal').innerText = internos;
+            document.getElementById('statExternal').innerText = externos;
+            document.getElementById('statTotal').innerText = internos + externos;
+            renderComponents();
+        };
+    </script>
+</body>
+</html>
